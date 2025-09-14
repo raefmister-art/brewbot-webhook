@@ -31,9 +31,19 @@ function processMessage(text, session) {
       return "Hello! Welcome to Brew Coffee Shop! ☕\n\nFirst, what table are you sitting at? (e.g., 'Table 5' or just '5')";
     }
     
+    // Check for greetings first - don't treat them as table numbers
+    if (lowerText.includes('hi') || lowerText.includes('hello') || lowerText.includes('hey') || lowerText === 'help') {
+      return "Hello! Welcome to Brew Coffee Shop! ☕\n\nFirst, what table are you sitting at? (e.g., 'Table 5' or just '5')";
+    }
+    
     const tableNum = text.toLowerCase().replace('table', '').trim();
     session.tableNumber = tableNum;
     return `Perfect! Table ${tableNum} noted.\n\nI'm here to help you with:\n\n🍳 View Menu - See today's food & drinks\n☕ Order Food/Coffee - Place your order now!\n🎂 Order Cake - Custom celebration cakes\n⏰ Opening Hours - When we're open\n📍 Location - How to find us\n🛒 My Order - Check your current order\n❓ Ask Questions - Vegan? Gluten-free? Just ask!\n\nJust type what you need!`;
+  }
+
+  // Greetings and help (after table is set)
+  if (lowerText.includes('hi') || lowerText.includes('hello') || lowerText.includes('hey') || lowerText === 'help') {
+    return "Hello! Great to see you!\n\nWhat can I help you with?\n\nOrder - Place a food/drink order\nMenu - View our full menu\nCoffee - See coffee options\nCart - Check your current order\nHours - Opening times\nLocation - Find us\n\nJust tell me what you need!";
   }
 
   // Greetings and help - Handle BEFORE menu item search
