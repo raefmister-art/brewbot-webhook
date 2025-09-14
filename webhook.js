@@ -49,7 +49,6 @@ function getUserSession(phoneNumber) {
   return userSessions[phoneNumber];
 }
 
-// Add the missing findMenuItem function
 function findMenuItem(searchText) {
   const lowerSearch = searchText.toLowerCase();
   
@@ -102,6 +101,11 @@ function processMessage(text, session) {
     return orderSummary;
   }
 
+  // Coffee menu only - handle before menu item search
+  if (lowerText === 'coffee') {
+    return `COFFEE & DRINKS MENU\n\n• Espresso - £3.00\n• Americano - £3.20\n• Flat White - £3.60\n• Latte - £3.70\n• Cappuccino - £3.80\n• Mocha - £4.20\n• Hot Chocolate - £4.00\n\nWe serve North Star Coffee from Leeds!\nPlant-based milk available.\n\nJust type the drink name you want!`;
+  }
+
   // Direct item ordering
   const foundItem = findMenuItem(text);
   if (foundItem) {
@@ -141,13 +145,18 @@ function processMessage(text, session) {
     return "What name should we use for your order?";
   }
 
-  // Menu display
+  // Full menu display
   if (lowerText.includes('menu')) {
-    return "MENU:\n\nCOFFEE:\n• Latte - £3.70\n• Cappuccino - £3.80\n• Americano - £3.20\n\nFOOD:\n• Big Brew Breakfast - £14.00\n• Eggs Benedict - £10.00\n• Avocado Toast - £10.00\n\nJust type what you want!";
+    return `BREW COFFEE SHOP MENU\n\nCOFFEE & DRINKS:\n• Espresso - £3.00\n• Americano - £3.20\n• Flat White - £3.60\n• Latte - £3.70\n• Cappuccino - £3.80\n• Mocha - £4.20\n• Hot Chocolate - £4.00\n\nBREAKFAST:\n• Big Brew Breakfast - £14.00\n• Little Brew Breakfast - £8.50\n• Eggs Benedict - £10.00\n• Eggs Benedict with Bacon - £13.00\n• Eggs Benedict with Salmon - £14.00\n• Breakfast Sandwich - £10.00\n• Eggs on Toast - £6.50\n\nBRUNCH & MAINS:\n• Steak & Eggs - £17.50\n• Green Eggs - £11.00\n• French Toast - £12.00\n• Avocado Toast - £10.00\n\nSIDES:\n• Korean Hashbrown Bites - £6.75\n• Corn Ribs - £5.00\n• Halloumi & Berry Ketchup - £6.00\n\nJust type what you want!`;
+  }
+
+  // Location & hours
+  if (lowerText.includes('hours') || lowerText.includes('location')) {
+    return `BREW COFFEE SHOP\n\n12 Brock Street\nLancaster, LA1\n\nOPENING HOURS:\n• Mon-Fri: 8:30am - 4:00pm\n• Saturday: 9:00am - 4:00pm\n• Sunday: 10:00am - 4:00pm\n\nFood served: 9:00am - 3:00pm\n\n5 minutes walk from Lancaster Castle!`;
   }
 
   // Default response
-  return "Type 'menu' to see options, or just tell me what you'd like!\n\n(e.g., 'latte', 'big breakfast')";
+  return "Type 'menu' to see options, 'coffee' for drinks, or just tell me what you'd like!\n\n(e.g., 'latte', 'big breakfast')";
 }
 
 app.post('/webhook', (req, res) => {
