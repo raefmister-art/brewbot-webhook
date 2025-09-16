@@ -103,6 +103,31 @@ function findMenuItem(searchText) {
   return null;
 }
 
+function findMultipleMenuItems(searchText) {
+  const lowerSearch = searchText.toLowerCase();
+  const foundItems = [];
+  
+  // Split search text by common separators
+  const keywords = lowerSearch.split(/\s+and\s+|\s*,\s*|\s*\+\s*/).filter(word => word.trim());
+  
+  for (const keyword of keywords) {
+    const item = findMenuItem(keyword.trim());
+    if (item && !foundItems.some(existing => existing.name === item.name)) {
+      foundItems.push(item);
+    }
+  }
+  
+  // If no multiple items found, try single item search
+  if (foundItems.length === 0) {
+    const singleItem = findMenuItem(searchText);
+    if (singleItem) {
+      foundItems.push(singleItem);
+    }
+  }
+  
+  return foundItems.length > 0 ? foundItems : null;
+}
+
 function addToCart(session, itemName, price, notes = '', category = '') {
   const cartItem = {
     id: Date.now(),
@@ -217,15 +242,63 @@ function processMessage(text, session) {
     return generateFullMenu();
   }
 
-  // Handle direct item ordering
-  const foundItem = findMenuItem(text);
-  if (foundItem) {
-    if (foundItem.category === 'coffee') {
-      session.currentFlow = 'ordering_coffee';
-      session.orderData = { selectedDrink: foundItem.name, price: foundItem.price };
-      return `${foundItem.name} - £${foundItem.price.toFixed(2)}\n\nMilk options:\n• Dairy milk (standard)\n• Oat milk\n• Almond milk\n• Soy milk\n\nWhat milk would you like?\n(Or just say 'dairy' for regular milk)`;
+  // Handle direct item ordering - now supports multiple items
+  const foundItems = findMultipleMenuItems(text);
+  if (foundItems) {
+    if (foundItems.length === 1) {
+      const foundItem = foundItems[0];
+      if (foundItem.category === 'coffee') {
+        session.currentFlow = 'ordering_coffee';
+        session.orderData = { selectedDrink: foundItem.name, price: foundItem.price };
+        return `${foundItem.name} - £${foundItem.price.toFixed(2)}\n\nMilk options:\n• Dairy milk (standard)\n• Oat milk\n• Almond milk\n• Soy milk\n\nWhat milk would you like?\n(Or just say 'dairy' for regular milk)`;
+      } else {
+        return addToCart(session, foundItem.name, foundItem.price, '', 'food');
+      }
     } else {
-      return addToCart(session, foundItem.name, foundItem.price, '', 'food');
+      // Multiple items found - add all to cart
+      let response = `Found ${foundItems.length} items! Adding to your cart:\n\n`;
+      let totalPrice = 0;
+      let hasCoffee = false;
+      
+      foundItems.forEach((item, index) => {
+        if (item.category === 'coffee') {
+          // Add coffee with default dairy milk
+          const cartItem = {
+            id: Date.now() + index,
+            name: item.name,
+            price: item.price,
+            notes: '',
+            quantity: 1,
+            table: session.tableNumber,
+            category: 'coffee'
+          };
+          session.cart.push(cartItem);
+          hasCoffee = true;
+        } else {
+          const cartItem = {
+            id: Date.now() + index,
+            name: item.name,
+            price: item.price,
+            notes: '',
+            quantity: 1,
+            table: session.tableNumber,
+            category: 'food'
+          };
+          session.cart.push(cartItem);
+        }
+        response += `${index + 1}. ${item.name} - £${item.price.toFixed(2)}\n`;
+        totalPrice += item.price;
+      });
+      
+      response += `\nTotal added: £${totalPrice.toFixed(2)}`;
+      
+      if (hasCoffee) {
+        response += `\n\nNote: Coffee items added with dairy milk (default).\n\nType 'cart' to see your full order or continue adding items!`;
+      } else {
+        response += `\n\nType 'cart' to see your full order or continue adding items!`;
+      }
+      
+      return response;
     }
   }
 
