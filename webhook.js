@@ -386,9 +386,42 @@ function processMessage(text, session) {
     return "🛒 PLACE YOUR ORDER\n\nWhat would you like?\n\n📋 Type 'menu' to see everything\n☕ Type 'coffee' to see coffee & drinks\n\nOr just type what you want (e.g., 'latte', 'breakfast sandwich')\n\nWhat would you like to order?";
   }
 
-  // Menu requests
+  // Menu requests - show full menu when someone types "menu"
   if (lowerText.includes('menu') || lowerText.includes('food') || lowerText.includes('breakfast') || lowerText.includes('brunch') || lowerText.includes('eat')) {
-    return "🍳 TODAY'S FOOD MENU\n\n🥞 BREAKFAST FAVOURITES:\n• Big Brew Breakfast - £14\n  Full English with everything!\n• Little Brew Breakfast - £8.50\n  Perfect lighter option\n• Eggs Benedict - £10\n  (+bacon £13, +salmon £14)\n• Breakfast Sandwich - £10\n• Eggs on Toast - £6.50\n\n🥗 BRUNCH SPECIALS:\n• Steak & Eggs - £17.50\n• Green Eggs (healthy!) - £11\n• French Toast - £12\n• Avocado Toast - £10\n\n🔥 POPULAR SIDES:\n• Korean Hashbrown Bites - £6.75\n• Corn Ribs - £5\n• Halloumi & Berry Ketchup - £6\n\n🌱 Vegan & Gluten-Free options available!\n\nWant to see coffee prices or order something? Just ask!";
+    let fullMenu = "📋 FULL MENU\n\n🍳 FOOD MENU\n\n🥞 BREAKFAST FAVOURITES:\n";
+    
+    // Breakfast items
+    const breakfastItems = ['Big Brew Breakfast', 'Little Brew Breakfast', 'Eggs Benedict', 'Eggs Benedict with Bacon', 'Eggs Benedict with Salmon', 'Breakfast Sandwich', 'Eggs on Toast'];
+    breakfastItems.forEach(item => {
+      if (menuItems.food[item]) {
+        fullMenu += `• ${item} - £${menuItems.food[item].toFixed(2)}\n`;
+      }
+    });
+    
+    fullMenu += "\n🥗 BRUNCH & MAINS:\n";
+    const brunchItems = ['Steak & Eggs', 'Green Eggs', 'French Toast', 'Avocado Toast'];
+    brunchItems.forEach(item => {
+      if (menuItems.food[item]) {
+        fullMenu += `• ${item} - £${menuItems.food[item].toFixed(2)}\n`;
+      }
+    });
+    
+    fullMenu += "\n🔥 SIDES:\n";
+    const sideItems = ['Korean Hashbrown Bites', 'Corn Ribs', 'Halloumi & Berry Ketchup'];
+    sideItems.forEach(item => {
+      if (menuItems.food[item]) {
+        fullMenu += `• ${item} - £${menuItems.food[item].toFixed(2)}\n`;
+      }
+    });
+    
+    fullMenu += "\n☕ COFFEE & DRINKS:\n";
+    Object.entries(menuItems.coffee).forEach(([item, price]) => {
+      fullMenu += `• ${item} - £${price.toFixed(2)}\n`;
+    });
+    
+    fullMenu += "\n🌱 Vegan & Gluten-Free options available!\n\nJust type the item name you'd like to order!\n(e.g., 'latte', 'big brew breakfast')";
+    
+    return fullMenu;
   }
 
   // Coffee menu (not ordering)
