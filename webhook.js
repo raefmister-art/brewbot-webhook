@@ -255,55 +255,54 @@ function processMessage(text, session) {
         return addToCart(session, foundItem.name, foundItem.price, '', 'food');
       }
     } else {
-      // Multiple items found - add all to cart
-      let response = `Found ${foundItems.length} items! Adding to your cart:\n\n`;
+      // Multiple items found - handle coffee + food combination properly
+      let response = `Found ${foundItems.length} items!\n\n`;
       let totalPrice = 0;
-      let hasCoffee = false;
+      let coffeeItem = null;
+      let foodItems = [];
       
+      // Separate coffee and food items
       foundItems.forEach((item, index) => {
-        if (item.category === 'coffee') {
-          // Add coffee with default dairy milk
-          const cartItem = {
-            id: Date.now() + index,
-            name: item.name,
-            price: item.price,
-            notes: '',
-            quantity: 1,
-            table: session.tableNumber,
-            category: 'coffee'
-          };
-          session.cart.push(cartItem);
-          hasCoffee = true;
-        } else {
-          const cartItem = {
-            id: Date.now() + index,
-            name: item.name,
-            price: item.price,
-            notes: '',
-            quantity: 1,
-            table: session.tableNumber,
-            category: 'food'
-          };
-          session.cart.push(cartItem);
-        }
         response += `${index + 1}. ${item.name} - £${item.price.toFixed(2)}\n`;
         totalPrice += item.price;
+        
+        if (item.category === 'coffee' && !coffeeItem) {
+          coffeeItem = item; // Only handle first coffee item for milk selection
+        } else {
+          foodItems.push(item);
+        }
       });
       
-      response += `\nTotal added: £${totalPrice.toFixed(2)}`;
+      // Add all food items to cart immediately
+      foodItems.forEach(item => {
+        const cartItem = {
+          id: Date.now() + Math.random(),
+          name: item.name,
+          price: item.price,
+          notes: '',
+          quantity: 1,
+          table: session.tableNumber,
+          category: 'food'
+        };
+        session.cart.push(cartItem);
+      });
       
-      if (hasCoffee) {
-        response += `\n\nNote: Coffee items added with dairy milk (default).\n\nType 'cart' to see your full order or continue adding items!`;
+      if (coffeeItem) {
+        // Set up coffee ordering flow for the coffee item
+        session.currentFlow = 'ordering_coffee';
+        session.orderData = { selectedDrink: coffeeItem.name, price: coffeeItem.price };
+        
+        response += `\nFood items added to cart!\n\nFor your ${coffeeItem.name}, what milk would you like?\n\nMilk options:\n• Dairy milk (standard)\n• Oat milk\n• Almond milk\n• Soy milk\n\n(Or just say 'dairy' for regular milk)`;
       } else {
-        response += `\n\nType 'cart' to see your full order or continue adding items!`;
+        response += `\nTotal added: £${totalPrice.toFixed(2)}\n\nType 'cart' to see your full order or continue adding items!`;
       }
       
       return response;
     }
   }
 
-  // Cart management
-  if (lowerText.includes('cart') || lowerText.includes('my order')) {
+  // Cart management - handle all variations
+  if (lowerText.includes('cart') || lowerText.includes('basket') || lowerText.includes('my order') || lowerText.includes('order status')) {
     if (session.cart.length === 0) {
       return "Your cart is empty\n\nType 'menu' to see what's available or type an item name to add it!";
     }
@@ -321,8 +320,8 @@ function processMessage(text, session) {
     return cartMessage;
   }
 
-  // Checkout
-  if (lowerText.includes('checkout') || lowerText.includes('place order')) {
+  // Checkout - handle all variations
+  if (lowerText.includes('checkout') || lowerText.includes('check out') || lowerText.includes('place order') || lowerText.includes('order now') || lowerText.includes('pay') || lowerText.includes('finish order') || lowerText.includes('complete order')) {
     if (session.cart.length === 0) {
       return "Your cart is empty!\n\nType 'menu' to see what's available or type an item name to add something first!";
     }
