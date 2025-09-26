@@ -377,8 +377,16 @@ function processMessage(text, session) {
   return "I'd love to help!\n\nTry:\n'menu' - See our full menu\n'coffee' - Coffee options\n'cart' - Your current order\n'hours' - Opening times\n'location' - Find us\n\nOr just type an item name like 'latte' or 'breakfast sandwich' to add it to your cart!";
 }
 
-// Admin Dashboard Route
+// Admin Dashboard Route with Basic Authentication
 app.get('/admin', (req, res) => {
+  // Basic authentication
+  const auth = req.headers.authorization;
+  const credentials = Buffer.from('admin:brewcoffee123').toString('base64');
+  
+  if (auth !== 'Basic ' + credentials) {
+    res.setHeader('WWW-Authenticate', 'Basic realm="Admin Dashboard"');
+    return res.status(401).send('Authentication required');
+  }
   res.send(`
 <!DOCTYPE html>
 <html>
