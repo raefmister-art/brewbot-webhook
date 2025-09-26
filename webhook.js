@@ -190,7 +190,7 @@ function addToCart(session, itemName, price, notes = '', category = '') {
 }
 
 function generateFullMenu() {
-  let fullMenu = "FULL MENU\n\nFOOD MENU\n\nBREAKFAST:\n";
+  let fullMenu = "**FULL MENU**\n\n**FOOD MENU**\n\n**BREAKFAST:**\n";
   
   // Breakfast items
   const breakfastItems = ['Big Brew Breakfast', 'Little Brew Breakfast', 'Eggs Benedict', 'Eggs Benedict with Bacon', 'Eggs Benedict with Salmon', 'Breakfast Sandwich', 'Eggs on Toast'];
@@ -200,7 +200,7 @@ function generateFullMenu() {
     }
   });
   
-  fullMenu += "\nBRUNCH & MAINS:\n";
+  fullMenu += "\n**BRUNCH & MAINS:**\n";
   const brunchItems = ['Steak & Eggs', 'Green Eggs', 'French Toast', 'Avocado Toast'];
   brunchItems.forEach(item => {
     if (menuItems.food[item]) {
@@ -208,7 +208,7 @@ function generateFullMenu() {
     }
   });
   
-  fullMenu += "\nSIDES:\n";
+  fullMenu += "\n**SIDES:**\n";
   const sideItems = ['Korean Hashbrown Bites', 'Corn Ribs', 'Halloumi & Berry Ketchup'];
   sideItems.forEach(item => {
     if (menuItems.food[item]) {
@@ -216,14 +216,46 @@ function generateFullMenu() {
     }
   });
   
-  fullMenu += "\nCOFFEE & DRINKS:\n";
+  fullMenu += "\n**COFFEE & DRINKS:**\n";
   Object.entries(menuItems.coffee).forEach(([item, price]) => {
     fullMenu += `• ${item} - £${price.toFixed(2)}\n`;
   });
   
-  fullMenu += "\nVegan & Gluten-Free options available!\n\nTo order, just type the item name!\n(e.g., 'latte', 'big brew breakfast')";
+  fullMenu += "\n**Vegan & Gluten-Free options available!**\nType 'vegan options' or 'gluten free options' to see what's available\n\nTo order, just type the item name!\n(e.g., 'latte', 'big brew breakfast')";
   
-  return fullMenu;
+function generateVeganMenu() {
+  let veganMenu = "**VEGAN OPTIONS** 🌱\n\n**FOOD:**\n";
+  veganMenu += "• Avocado Toast - £10.00\n";
+  veganMenu += "• Green Eggs (made with tofu) - £11.00\n";
+  veganMenu += "• French Toast (vegan bread & plant milk) - £12.00\n";
+  veganMenu += "• Korean Hashbrown Bites - £6.75\n";
+  veganMenu += "• Corn Ribs - £5.00\n";
+  
+  veganMenu += "\n**DRINKS:**\n";
+  veganMenu += "• All coffee drinks with oat/almond/soy milk\n";
+  veganMenu += "• Hot Chocolate (oat milk) - £4.00\n";
+  
+  veganMenu += "\n**Available plant-based milks:**\n• Oat milk • Almond milk • Soy milk\n\nJust mention 'vegan' when ordering and we'll make sure everything is plant-based!";
+  
+  return veganMenu;
+}
+
+function generateGlutenFreeMenu() {
+  let gfMenu = "**GLUTEN-FREE OPTIONS** 🌾\n\n**FOOD:**\n";
+  gfMenu += "• Green Eggs (naturally GF) - £11.00\n";
+  gfMenu += "• Eggs Benedict (GF bread available) - £10.00\n";
+  gfMenu += "• Avocado Toast (GF bread) - £10.00\n";
+  gfMenu += "• Korean Hashbrown Bites - £6.75\n";
+  gfMenu += "• Corn Ribs - £5.00\n";
+  gfMenu += "• Halloumi & Berry Ketchup - £6.00\n";
+  
+  gfMenu += "\n**DRINKS:**\n";
+  gfMenu += "• All coffee drinks (naturally GF)\n";
+  gfMenu += "• Hot Chocolate - £4.00\n";
+  
+  gfMenu += "\n**Note:** We use separate preparation areas for GF items\nJust mention 'gluten-free' when ordering!";
+  
+  return gfMenu;
 }
 
 function processMessage(text, session) {
@@ -237,7 +269,7 @@ function processMessage(text, session) {
     
     const tableNum = text.toLowerCase().replace('table', '').trim();
     session.tableNumber = tableNum;
-    return `Perfect! Table ${tableNum} noted.\n\nI'm here to help you with:\n\nOrder - Start placing your order\nMenu - View our full menu\nCoffee - See coffee & drink options\nCart - Check your current order\nHours - Opening times\nLocation - Find us\n\nWhat would you like to do?`;
+    return `Perfect! Table ${tableNum} noted.\n\nI'm here to help you with:\n\n**Order** - Start placing your order\n**Menu** - View our full menu\n**Coffee** - See coffee & drink options\n**Cart** - Check your current order\n**Vegan Options** - Plant-based menu\n**Gluten-Free Options** - GF menu\n**Hours** - Opening times\n**Location** - Find us\n\nWhat would you like to do?`;
   }
 
   // Handle coffee ordering flow - now supports multiple coffee items
@@ -417,28 +449,38 @@ function processMessage(text, session) {
     return "Cart cleared!\n\nReady to start fresh? Type 'menu' to see what's available!";
   }
 
+  // Vegan options
+  if (lowerText.includes('vegan') && (lowerText.includes('options') || lowerText.includes('menu'))) {
+    return generateVeganMenu();
+  }
+
+  // Gluten-free options
+  if ((lowerText.includes('gluten free') || lowerText.includes('gluten-free') || lowerText.includes('gf')) && (lowerText.includes('options') || lowerText.includes('menu'))) {
+    return generateGlutenFreeMenu();
+  }
+
   // Coffee menu
   if (lowerText === 'coffee' && !session.currentFlow) {
-    let coffeeMenu = "COFFEE & DRINKS MENU\n\n";
+    let coffeeMenu = "**COFFEE & DRINKS MENU**\n\n";
     Object.entries(menuItems.coffee).forEach(([item, price]) => {
       coffeeMenu += `• ${item} - £${price.toFixed(2)}\n`;
     });
-    coffeeMenu += "\nWe serve North Star Coffee from Leeds!\nPlant-based milk available.\n\nTo order, just type the drink name!";
+    coffeeMenu += "\nWe serve North Star Coffee from Leeds!\n**Plant-based milk available:** Oat, Almond, Soy\n\nTo order, just type the drink name!";
     return coffeeMenu;
   }
 
   // Hours & Location
   if (lowerText.includes('hours') || lowerText.includes('open') || lowerText.includes('location') || lowerText.includes('address') || lowerText.includes('where')) {
-    return `BREW COFFEE SHOP\n\n12 Brock Street\nLancaster, LA1\n\nOPENING HOURS:\n• Monday-Friday: 8:30am - 4:00pm\n• Saturday: 9:00am - 4:00pm  \n• Sunday: 10:00am - 4:00pm\n\nFood served: 9:00am - 3:00pm daily\n\n5 minutes walk from Lancaster Castle!`;
+    return `**BREW COFFEE SHOP**\n\n12 Brock Street\nLancaster, LA1\n\n**OPENING HOURS:**\n• Monday-Friday: 8:30am - 4:00pm\n• Saturday: 9:00am - 4:00pm  \n• Sunday: 10:00am - 4:00pm\n\n**Food served:** 9:00am - 3:00pm daily\n\n5 minutes walk from Lancaster Castle!`;
   }
 
   // Greetings
   if (lowerText.includes('hi') || lowerText.includes('hello') || lowerText.includes('hey') || lowerText === 'help') {
-    return "Hello! Great to see you!\n\nWhat can I help you with?\n\nOrder - Place a food/drink order\nMenu - View our full menu\nCoffee - See coffee options\nCart - Check your current order\nHours - Opening times\nLocation - Find us\n\nJust tell me what you need!";
+    return "Hello! Great to see you!\n\nWhat can I help you with?\n\n**Order** - Place a food/drink order\n**Menu** - View our full menu\n**Coffee** - See coffee options\n**Cart** - Check your current order\n**Vegan Options** - Plant-based menu\n**Gluten-Free Options** - GF menu\n**Hours** - Opening times\n**Location** - Find us\n\nJust tell me what you need!";
   }
 
   // Fallback
-  return "I'd love to help!\n\nTry:\n'menu' - See our full menu\n'coffee' - Coffee options\n'cart' - Your current order\n'hours' - Opening times\n'location' - Find us\n\nOr just type an item name like 'latte' or 'breakfast sandwich' to add it to your cart!";
+  return "I'd love to help!\n\nTry:\n**'menu'** - See our full menu\n**'coffee'** - Coffee options\n**'cart'** - Your current order\n**'vegan options'** - Plant-based menu\n**'gluten free options'** - GF menu\n**'hours'** - Opening times\n**'location'** - Find us\n\nOr just type an item name like 'latte' or 'breakfast sandwich' to add it to your cart!";
 }
 
 // Admin Dashboard Route with Basic Authentication
@@ -681,3 +723,4 @@ app.post('/webhook', (req, res) => {
 app.listen(process.env.PORT || 3000, () => {
   console.log('Webhook server with admin dashboard running...');
 });
+}
