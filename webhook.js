@@ -110,21 +110,64 @@ function findMultipleMenuItems(searchText) {
   const lowerSearch = searchText.toLowerCase();
   const foundItems = [];
   
-  // Split search text by common separators
-  const keywords = lowerSearch.split(/\s+and\s+|\s*,\s*|\s*\+\s*/).filter(word => word.trim());
+  // Handle quantity patterns like "two espresso", "2 americano", "three hashbrown bites"
+  const quantityWords = {
+    'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
+    '1': 1, '2': 2, '3': 3, '4': 4, '5': 5
+  };
   
-  for (const keyword of keywords) {
-    const item = findMenuItem(keyword.trim());
-    if (item && !foundItems.some(existing => existing.name === item.name)) {
-      foundItems.push(item);
+  // Split search text by common separators
+  let keywords = lowerSearch.split(/\s+and\s+|\s*,\s*|\s*\+\s*/).filter(word => word.trim());
+  
+  for (let keyword of keywords) {
+    keyword = keyword.trim();
+    let quantity = 1;
+    
+    // Check for quantity at the beginning
+    for (const [word, qty] of Object.entries(quantityWords)) {
+      if (keyword.startsWith(word + ' ')) {
+        quantity = qty;
+        keyword = keyword.replace(word + ' ', '');
+        break;
+      }
+    }
+    
+    const item = findMenuItem(keyword);
+    if (item) {
+      // Add multiple instances for quantity
+      for (let i = 0; i < quantity; i++) {
+        foundItems.push({
+          ...item,
+          originalQuantity: quantity,
+          instanceNumber: i + 1
+        });
+      }
     }
   }
   
   // If no multiple items found, try single item search
   if (foundItems.length === 0) {
-    const singleItem = findMenuItem(searchText);
+    let searchKeyword = lowerSearch;
+    let quantity = 1;
+    
+    // Check for quantity in single item
+    for (const [word, qty] of Object.entries(quantityWords)) {
+      if (searchKeyword.startsWith(word + ' ')) {
+        quantity = qty;
+        searchKeyword = searchKeyword.replace(word + ' ', '');
+        break;
+      }
+    }
+    
+    const singleItem = findMenuItem(searchKeyword);
     if (singleItem) {
-      foundItems.push(singleItem);
+      for (let i = 0; i < quantity; i++) {
+        foundItems.push({
+          ...singleItem,
+          originalQuantity: quantity,
+          instanceNumber: i + 1
+        });
+      }
     }
   }
   
@@ -197,26 +240,36 @@ function processMessage(text, session) {
     return `Perfect! Table ${tableNum} noted.\n\nI'm here to help you with:\n\nOrder - Start placing your order\nMenu - View our full menu\nCoffee - See coffee & drink options\nCart - Check your current order\nHours - Opening times\nLocation - Find us\n\nWhat would you like to do?`;
   }
 
-  // Handle coffee ordering flow
+  // Handle coffee ordering flow - now supports multiple coffee items
   if (session.currentFlow === 'ordering_coffee') {
-    if (session.orderData.selectedDrink && !session.orderData.hasOwnProperty('milkChoice')) {
+    if (session.orderData.pendingCoffeeItems && session.orderData.pendingCoffeeItems.length > 0) {
       const milkChoice = text.toLowerCase().includes('dairy') ? 'dairy milk' : text.toLowerCase();
       const notes = milkChoice === 'dairy milk' ? '' : `with ${milkChoice}`;
       
+      // Add the current coffee item to cart
+      const currentCoffeeItem = session.orderData.pendingCoffeeItems.shift();
       const cartItem = {
         id: Date.now(),
-        name: session.orderData.selectedDrink,
-        price: session.orderData.price,
+        name: currentCoffeeItem.name,
+        price: currentCoffeeItem.price,
         notes: notes,
         quantity: 1,
         table: session.tableNumber
       };
       session.cart.push(cartItem);
       
-      session.currentFlow = null;
-      session.orderData = {};
-      
-      return `Added to cart!\n\n${cartItem.name} - £${cartItem.price.toFixed(2)}\nTable: ${session.tableNumber}\n${notes ? `Notes: ${notes}\n` : ''}Type 'cart' to see your full order or continue adding items!\n\nGreat choice!\n\nWant to add more?\n• Type an item name to add it\n• Type 'menu' to see all options\n• Type 'cart' to see your order\n• Type 'checkout' when ready to order!\n\nWhat else can I get you?`;
+      // Check if there are more coffee items to process
+      if (session.orderData.pendingCoffeeItems.length > 0) {
+        const nextCoffeeItem = session.orderData.pendingCoffeeItems[0];
+        const remaining = session.orderData.pendingCoffeeItems.length;
+        return `${currentCoffeeItem.name} ${notes ? `(${notes})` : '(dairy milk)'} added to cart!\n\nNext coffee item: ${nextCoffeeItem.name} - £${nextCoffeeItem.price.toFixed(2)}\n(${remaining} coffee ${remaining === 1 ? 'item' : 'items'} remaining)\n\nMilk options:\n• Dairy milk (standard)\n• Oat milk\n• Almond milk\n• Soy milk\n\nWhat milk for this ${nextCoffeeItem.name}?`;
+      } else {
+        // All coffee items processed
+        session.currentFlow = null;
+        session.orderData = {};
+        
+        return `${currentCoffeeItem.name} ${notes ? `(${notes})` : '(dairy milk)'} added to cart!\n\nAll items added! Great choice!\n\nWant to add more?\n• Type an item name to add it\n• Type 'menu' to see all options\n• Type 'cart' to see your order\n• Type 'checkout' when ready to order!\n\nWhat else can I get you?`;
+      }
     }
   }
 
@@ -266,16 +319,18 @@ function processMessage(text, session) {
       const foundItem = foundItems[0];
       if (foundItem.category === 'coffee') {
         session.currentFlow = 'ordering_coffee';
-        session.orderData = { selectedDrink: foundItem.name, price: foundItem.price };
+        session.orderData = { 
+          pendingCoffeeItems: [foundItem]
+        };
         return `${foundItem.name} - £${foundItem.price.toFixed(2)}\n\nMilk options:\n• Dairy milk (standard)\n• Oat milk\n• Almond milk\n• Soy milk\n\nWhat milk would you like?\n(Or just say 'dairy' for regular milk)`;
       } else {
         return addToCart(session, foundItem.name, foundItem.price, '', 'food');
       }
     } else {
-      // Multiple items found - handle coffee + food combination properly
+      // Multiple items found - handle coffee + food combination and quantities properly
       let response = `Found ${foundItems.length} items!\n\n`;
       let totalPrice = 0;
-      let coffeeItem = null;
+      let coffeeItems = [];
       let foodItems = [];
       
       // Separate coffee and food items
@@ -283,8 +338,8 @@ function processMessage(text, session) {
         response += `${index + 1}. ${item.name} - £${item.price.toFixed(2)}\n`;
         totalPrice += item.price;
         
-        if (item.category === 'coffee' && !coffeeItem) {
-          coffeeItem = item; // Only handle first coffee item for milk selection
+        if (item.category === 'coffee') {
+          coffeeItems.push(item);
         } else {
           foodItems.push(item);
         }
@@ -304,12 +359,21 @@ function processMessage(text, session) {
         session.cart.push(cartItem);
       });
       
-      if (coffeeItem) {
-        // Set up coffee ordering flow for the coffee item
+      if (coffeeItems.length > 0) {
+        // Set up coffee ordering flow for all coffee items
         session.currentFlow = 'ordering_coffee';
-        session.orderData = { selectedDrink: coffeeItem.name, price: coffeeItem.price };
+        session.orderData = { 
+          pendingCoffeeItems: [...coffeeItems]
+        };
         
-        response += `\nFood items added to cart!\n\nFor your ${coffeeItem.name}, what milk would you like?\n\nMilk options:\n• Dairy milk (standard)\n• Oat milk\n• Almond milk\n• Soy milk\n\n(Or just say 'dairy' for regular milk)`;
+        const firstCoffeeItem = coffeeItems[0];
+        const coffeeCount = coffeeItems.length;
+        
+        if (foodItems.length > 0) {
+          response += `\nFood items added to cart!`;
+        }
+        
+        response += `\nNow for your coffee ${coffeeCount > 1 ? 'items' : 'item'}:\n\n${firstCoffeeItem.name} - £${firstCoffeeItem.price.toFixed(2)}\n${coffeeCount > 1 ? `(${coffeeCount} coffee items total)\n` : ''}\nMilk options:\n• Dairy milk (standard)\n• Oat milk\n• Almond milk\n• Soy milk\n\nWhat milk would you like for this ${firstCoffeeItem.name}?\n(Or just say 'dairy' for regular milk)`;
       } else {
         response += `\nTotal added: £${totalPrice.toFixed(2)}\n\nType 'cart' to see your full order or continue adding items!`;
       }
