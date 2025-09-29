@@ -1,11 +1,10 @@
+// webhook.js
 const express = require('express');
 const { MessagingResponse } = require('twilio').twiml;
-const path = require('path');
 
 const app = express();
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
-app.use(express.static('public'));
 
 // Store user sessions and orders
 const userSessions = {};
@@ -56,7 +55,6 @@ function getUserSession(phoneNumber) {
 function findMenuItem(searchText) {
   const lowerSearch = searchText.toLowerCase();
   
-  // Define alternative names and partial matches
   const itemAliases = {
     'big brew breakfast': ['big breakfast', 'full english', 'big brew', 'full breakfast'],
     'little brew breakfast': ['little breakfast', 'small breakfast', 'little brew'],
@@ -81,7 +79,6 @@ function findMenuItem(searchText) {
     'hot chocolate': ['chocolate', 'hot choc', 'cocoa']
   };
   
-  // Check coffee items
   for (const [item, price] of Object.entries(menuItems.coffee)) {
     const itemLower = item.toLowerCase();
     if (itemLower.includes(lowerSearch) || 
@@ -92,7 +89,6 @@ function findMenuItem(searchText) {
     }
   }
   
-  // Check food items
   for (const [item, price] of Object.entries(menuItems.food)) {
     const itemLower = item.toLowerCase();
     if (itemLower.includes(lowerSearch) || 
@@ -110,20 +106,17 @@ function findMultipleMenuItems(searchText) {
   const lowerSearch = searchText.toLowerCase();
   const foundItems = [];
   
-  // Handle quantity patterns like "two espresso", "2 americano", "three hashbrown bites"
   const quantityWords = {
     'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
     '1': 1, '2': 2, '3': 3, '4': 4, '5': 5
   };
   
-  // Split search text by common separators
   let keywords = lowerSearch.split(/\s+and\s+|\s*,\s*|\s*\+\s*/).filter(word => word.trim());
   
   for (let keyword of keywords) {
     keyword = keyword.trim();
     let quantity = 1;
     
-    // Check for quantity at the beginning
     for (const [word, qty] of Object.entries(quantityWords)) {
       if (keyword.startsWith(word + ' ')) {
         quantity = qty;
@@ -134,7 +127,6 @@ function findMultipleMenuItems(searchText) {
     
     const item = findMenuItem(keyword);
     if (item) {
-      // Add multiple instances for quantity
       for (let i = 0; i < quantity; i++) {
         foundItems.push({
           ...item,
@@ -145,12 +137,10 @@ function findMultipleMenuItems(searchText) {
     }
   }
   
-  // If no multiple items found, try single item search
   if (foundItems.length === 0) {
     let searchKeyword = lowerSearch;
     let quantity = 1;
     
-    // Check for quantity in single item
     for (const [word, qty] of Object.entries(quantityWords)) {
       if (searchKeyword.startsWith(word + ' ')) {
         quantity = qty;
@@ -186,17 +176,19 @@ function addToCart(session, itemName, price, notes = '', category = '') {
   };
   session.cart.push(cartItem);
   
-  return `Added to cart!\n\n${cartItem.name} - £${cartItem.price.toFixed(2)}\nTable: ${session.tableNumber}\n${notes ? `Notes: ${notes}\n` : ''}Type 'cart' to see your full order or continue adding items!`;
+  const total = session.cart.reduce((sum, item) => sum + item.price, 0).toFixed(2);
+  const itemCount = session.cart.length;
+  
+  return `Added ${cartItem.name} - £${cartItem.price.toFixed(2)}!\n\nCart: ${itemCount} ${itemCount === 1 ? 'item' : 'items'} | Total: £${total}\n\nQuick actions:\n- 'checkout' to order now\n- 'cart' to review\n- Add more items by name`;
 }
 
 function generateFullMenu() {
   let fullMenu = "FULL MENU\n\nFOOD MENU\n\nBREAKFAST:\n";
   
-  // Breakfast items
   const breakfastItems = ['Big Brew Breakfast', 'Little Brew Breakfast', 'Eggs Benedict', 'Eggs Benedict with Bacon', 'Eggs Benedict with Salmon', 'Breakfast Sandwich', 'Eggs on Toast'];
   breakfastItems.forEach(item => {
     if (menuItems.food[item]) {
-      fullMenu += `• ${item} - £${menuItems.food[item].toFixed(2)}\n`;
+      fullMenu += `- ${item} - £${menuItems.food[item].toFixed(2)}\n`;
     }
   });
   
@@ -204,7 +196,7 @@ function generateFullMenu() {
   const brunchItems = ['Steak & Eggs', 'Green Eggs', 'French Toast', 'Avocado Toast'];
   brunchItems.forEach(item => {
     if (menuItems.food[item]) {
-      fullMenu += `• ${item} - £${menuItems.food[item].toFixed(2)}\n`;
+      fullMenu += `- ${item} - £${menuItems.food[item].toFixed(2)}\n`;
     }
   });
   
@@ -212,24 +204,58 @@ function generateFullMenu() {
   const sideItems = ['Korean Hashbrown Bites', 'Corn Ribs', 'Halloumi & Berry Ketchup'];
   sideItems.forEach(item => {
     if (menuItems.food[item]) {
-      fullMenu += `• ${item} - £${menuItems.food[item].toFixed(2)}\n`;
+      fullMenu += `- ${item} - £${menuItems.food[item].toFixed(2)}\n`;
     }
   });
   
   fullMenu += "\nCOFFEE & DRINKS:\n";
   Object.entries(menuItems.coffee).forEach(([item, price]) => {
-    fullMenu += `• ${item} - £${price.toFixed(2)}\n`;
+    fullMenu += `- ${item} - £${price.toFixed(2)}\n`;
   });
   
-  fullMenu += "\nVegan & Gluten-Free options available!\n\nTo order, just type the item name!\n(e.g., 'latte', 'big brew breakfast')";
+  fullMenu += "\nVegan & Gluten-Free options available!\nType 'vegan options' or 'gluten free options' to see what's available\n\nTo order, just type the item name!";
   
   return fullMenu;
+}
+
+function generateVeganMenu() {
+  let veganMenu = "VEGAN OPTIONS\n\nFOOD:\n";
+  veganMenu += "- Avocado Toast - £10.00\n";
+  veganMenu += "- Green Eggs (made with tofu) - £11.00\n";
+  veganMenu += "- French Toast (vegan bread & plant milk) - £12.00\n";
+  veganMenu += "- Korean Hashbrown Bites - £6.75\n";
+  veganMenu += "- Corn Ribs - £5.00\n";
+  
+  veganMenu += "\nDRINKS:\n";
+  veganMenu += "- All coffee drinks with oat/almond/soy milk\n";
+  veganMenu += "- Hot Chocolate (oat milk) - £4.00\n";
+  
+  veganMenu += "\nAvailable plant-based milks: Oat, Almond, Soy\n\nJust mention 'vegan' when ordering!";
+  
+  return veganMenu;
+}
+
+function generateGlutenFreeMenu() {
+  let gfMenu = "GLUTEN-FREE OPTIONS\n\nFOOD:\n";
+  gfMenu += "- Green Eggs (naturally GF) - £11.00\n";
+  gfMenu += "- Eggs Benedict (GF bread available) - £10.00\n";
+  gfMenu += "- Avocado Toast (GF bread) - £10.00\n";
+  gfMenu += "- Korean Hashbrown Bites - £6.75\n";
+  gfMenu += "- Corn Ribs - £5.00\n";
+  gfMenu += "- Halloumi & Berry Ketchup - £6.00\n";
+  
+  gfMenu += "\nDRINKS:\n";
+  gfMenu += "- All coffee drinks (naturally GF)\n";
+  gfMenu += "- Hot Chocolate - £4.00\n";
+  
+  gfMenu += "\nNote: We use separate preparation areas for GF items\nJust mention 'gluten-free' when ordering!";
+  
+  return gfMenu;
 }
 
 function processMessage(text, session) {
   const lowerText = text.toLowerCase();
   
-  // Handle table number setup first
   if (!session.tableNumber) {
     if (lowerText.includes('hi') || lowerText.includes('hello') || lowerText.includes('hey') || lowerText === 'help') {
       return "Hello! Welcome to Brew Coffee Shop!\n\nFirst, what table are you sitting at? (e.g., 'Table 5' or just '5')";
@@ -237,16 +263,14 @@ function processMessage(text, session) {
     
     const tableNum = text.toLowerCase().replace('table', '').trim();
     session.tableNumber = tableNum;
-    return `Perfect! Table ${tableNum} noted.\n\nI'm here to help you with:\n\nOrder - Start placing your order\nMenu - View our full menu\nCoffee - See coffee & drink options\nCart - Check your current order\nHours - Opening times\nLocation - Find us\n\nWhat would you like to do?`;
+    return `Perfect! Table ${tableNum} noted.\n\nQUICK START:\n\nPopular orders:\n- Latte - £3.70\n- Flat White - £3.60\n- Big Brew Breakfast - £14\n- Avocado Toast - £10\n\nJust type any item to order!\n\nOr type 'menu' to see everything`;
   }
 
-  // Handle coffee ordering flow - now supports multiple coffee items
   if (session.currentFlow === 'ordering_coffee') {
     if (session.orderData.pendingCoffeeItems && session.orderData.pendingCoffeeItems.length > 0) {
       const milkChoice = text.toLowerCase().includes('dairy') ? 'dairy milk' : text.toLowerCase();
       const notes = milkChoice === 'dairy milk' ? '' : `with ${milkChoice}`;
       
-      // Add the current coffee item to cart
       const currentCoffeeItem = session.orderData.pendingCoffeeItems.shift();
       const cartItem = {
         id: Date.now(),
@@ -258,27 +282,26 @@ function processMessage(text, session) {
       };
       session.cart.push(cartItem);
       
-      // Check if there are more coffee items to process
       if (session.orderData.pendingCoffeeItems.length > 0) {
         const nextCoffeeItem = session.orderData.pendingCoffeeItems[0];
         const remaining = session.orderData.pendingCoffeeItems.length;
-        return `${currentCoffeeItem.name} ${notes ? `(${notes})` : '(dairy milk)'} added to cart!\n\nNext coffee item: ${nextCoffeeItem.name} - £${nextCoffeeItem.price.toFixed(2)}\n(${remaining} coffee ${remaining === 1 ? 'item' : 'items'} remaining)\n\nMilk options:\n• Dairy milk (standard)\n• Oat milk\n• Almond milk\n• Soy milk\n\nWhat milk for this ${nextCoffeeItem.name}?`;
+        return `Added ${currentCoffeeItem.name} ${notes ? `(${notes})` : '(dairy)'}!\n\n${nextCoffeeItem.name} - £${nextCoffeeItem.price.toFixed(2)}\n\nMilk? Reply: dairy / oat / almond / soy\n(${remaining} coffee ${remaining === 1 ? 'item' : 'items'} left)`;
       } else {
-        // All coffee items processed
         session.currentFlow = null;
         session.orderData = {};
         
-        return `${currentCoffeeItem.name} ${notes ? `(${notes})` : '(dairy milk)'} added to cart!\n\nAll items added! Great choice!\n\nWant to add more?\n• Type an item name to add it\n• Type 'menu' to see all options\n• Type 'cart' to see your order\n• Type 'checkout' when ready to order!\n\nWhat else can I get you?`;
+        const total = session.cart.reduce((sum, item) => sum + item.price, 0).toFixed(2);
+        const itemCount = session.cart.length;
+        
+        return `Added ${currentCoffeeItem.name}!\n\nCart: ${itemCount} ${itemCount === 1 ? 'item' : 'items'} | £${total}\n\nQuick actions:\n- Type 'checkout' to order now\n- Type 'cart' to review\n- Type item name to add more`;
       }
     }
   }
 
-  // Handle checkout flow
   if (session.currentFlow === 'checkout') {
     const total = session.cart.reduce((sum, item) => sum + item.price, 0).toFixed(2);
     const orderNumber = Math.floor(Math.random() * 1000) + 100;
     
-    // Create order for staff dashboard
     const newOrder = {
       id: orderNumber,
       table: session.tableNumber,
@@ -299,7 +322,7 @@ function processMessage(text, session) {
       if (item.notes) orderSummary += `   ${item.notes}\n`;
     });
     
-    orderSummary += `\nTotal: £${total}\n\nORDER SENT TO KITCHEN!\nYour order is being prepared\nReady in: 10-15 minutes\nWe'll bring it to Table ${session.tableNumber}\nPay when we deliver your order\n\nThank you for choosing Brew Coffee Shop!`;
+    orderSummary += `\nTotal: £${total}\n\nORDER CONFIRMED!\nReady in: 10-15 minutes\nDelivering to Table ${session.tableNumber}\nPay when we bring your order\n\nThanks for choosing Brew Coffee Shop!\n\nOrder again: Just type another item name!`;
     
     session.cart = [];
     session.currentFlow = null;
@@ -307,12 +330,10 @@ function processMessage(text, session) {
     return orderSummary;
   }
 
-  // Menu display - MAIN FUNCTIONALITY
   if (lowerText.includes('menu')) {
     return generateFullMenu();
   }
 
-  // Handle direct item ordering - now supports multiple items
   const foundItems = findMultipleMenuItems(text);
   if (foundItems) {
     if (foundItems.length === 1) {
@@ -322,18 +343,16 @@ function processMessage(text, session) {
         session.orderData = { 
           pendingCoffeeItems: [foundItem]
         };
-        return `${foundItem.name} - £${foundItem.price.toFixed(2)}\n\nMilk options:\n• Dairy milk (standard)\n• Oat milk\n• Almond milk\n• Soy milk\n\nWhat milk would you like?\n(Or just say 'dairy' for regular milk)`;
+        return `${foundItem.name} - £${foundItem.price.toFixed(2)}\n\nMilk? Reply: dairy / oat / almond / soy`;
       } else {
         return addToCart(session, foundItem.name, foundItem.price, '', 'food');
       }
     } else {
-      // Multiple items found - handle coffee + food combination and quantities properly
       let response = `Found ${foundItems.length} items!\n\n`;
       let totalPrice = 0;
       let coffeeItems = [];
       let foodItems = [];
       
-      // Separate coffee and food items
       foundItems.forEach((item, index) => {
         response += `${index + 1}. ${item.name} - £${item.price.toFixed(2)}\n`;
         totalPrice += item.price;
@@ -345,7 +364,6 @@ function processMessage(text, session) {
         }
       });
       
-      // Add all food items to cart immediately
       foodItems.forEach(item => {
         const cartItem = {
           id: Date.now() + Math.random(),
@@ -360,7 +378,6 @@ function processMessage(text, session) {
       });
       
       if (coffeeItems.length > 0) {
-        // Set up coffee ordering flow for all coffee items
         session.currentFlow = 'ordering_coffee';
         session.orderData = { 
           pendingCoffeeItems: [...coffeeItems]
@@ -370,10 +387,10 @@ function processMessage(text, session) {
         const coffeeCount = coffeeItems.length;
         
         if (foodItems.length > 0) {
-          response += `\nFood items added to cart!`;
+          response += `\nFood items added!`;
         }
         
-        response += `\nNow for your coffee ${coffeeCount > 1 ? 'items' : 'item'}:\n\n${firstCoffeeItem.name} - £${firstCoffeeItem.price.toFixed(2)}\n${coffeeCount > 1 ? `(${coffeeCount} coffee items total)\n` : ''}\nMilk options:\n• Dairy milk (standard)\n• Oat milk\n• Almond milk\n• Soy milk\n\nWhat milk would you like for this ${firstCoffeeItem.name}?\n(Or just say 'dairy' for regular milk)`;
+        response += `\n\n${firstCoffeeItem.name} - £${firstCoffeeItem.price.toFixed(2)}\n${coffeeCount > 1 ? `(${coffeeCount} coffees total)\n` : ''}Milk? Reply: dairy / oat / almond / soy`;
       } else {
         response += `\nTotal added: £${totalPrice.toFixed(2)}\n\nType 'cart' to see your full order or continue adding items!`;
       }
@@ -382,10 +399,9 @@ function processMessage(text, session) {
     }
   }
 
-  // Cart management - handle all variations
   if (lowerText.includes('cart') || lowerText.includes('basket') || lowerText.includes('my order') || lowerText.includes('order status')) {
     if (session.cart.length === 0) {
-      return "Your cart is empty\n\nType 'menu' to see what's available or type an item name to add it!";
+      return "Cart is empty\n\nPopular items:\n- Latte - £3.70\n- Big Brew Breakfast - £14\n- Avocado Toast - £10\n\nJust type an item name to order!";
     }
 
     const total = session.cart.reduce((sum, item) => sum + item.price, 0).toFixed(2);
@@ -396,54 +412,56 @@ function processMessage(text, session) {
       if (item.notes) cartMessage += `   ${item.notes}\n`;
     });
     
-    cartMessage += `\nTotal: £${total}\n\nReady?\n• Type 'checkout' to place your order\n• Type 'clear cart' to start over\n• Continue adding items by typing their names`;
+    cartMessage += `\nTotal: £${total}\n\nQuick checkout:\nType 'checkout' to order now!\nEstimated ready: 10-15 min`;
     
     return cartMessage;
   }
 
-  // Checkout - handle all variations
   if (lowerText.includes('checkout') || lowerText.includes('check out') || lowerText.includes('place order') || lowerText.includes('order now') || lowerText.includes('pay') || lowerText.includes('finish order') || lowerText.includes('complete order')) {
     if (session.cart.length === 0) {
-      return "Your cart is empty!\n\nType 'menu' to see what's available or type an item name to add something first!";
+      return "Cart empty!\n\nQuick order suggestions:\n- Latte + Avocado Toast - £13.70\n- Cappuccino + Big Brew Breakfast - £17.80\n- Flat White + French Toast - £15.60\n\nType any item to add!";
     }
     
     session.currentFlow = 'checkout';
-    return "READY TO ORDER!\n\nI just need a name for your order so our team knows who it's for.\n\nWhat name should we use?\n(e.g., 'Sarah', 'John', etc.)";
+    const total = session.cart.reduce((sum, item) => sum + item.price, 0).toFixed(2);
+    return `ALMOST THERE!\n\nTotal: £${total}\nReady in: 10-15 min\n\nName for your order?\n(e.g., 'Sarah', 'John')`;
   }
 
-  // Clear cart
   if (lowerText.includes('clear cart') || lowerText.includes('empty cart')) {
     session.cart = [];
     return "Cart cleared!\n\nReady to start fresh? Type 'menu' to see what's available!";
   }
 
-  // Coffee menu
+  if (lowerText.includes('vegan') && (lowerText.includes('options') || lowerText.includes('menu'))) {
+    return generateVeganMenu();
+  }
+
+  if ((lowerText.includes('gluten free') || lowerText.includes('gluten-free') || lowerText.includes('gf')) && (lowerText.includes('options') || lowerText.includes('menu'))) {
+    return generateGlutenFreeMenu();
+  }
+
   if (lowerText === 'coffee' && !session.currentFlow) {
     let coffeeMenu = "COFFEE & DRINKS MENU\n\n";
     Object.entries(menuItems.coffee).forEach(([item, price]) => {
-      coffeeMenu += `• ${item} - £${price.toFixed(2)}\n`;
+      coffeeMenu += `- ${item} - £${price.toFixed(2)}\n`;
     });
-    coffeeMenu += "\nWe serve North Star Coffee from Leeds!\nPlant-based milk available.\n\nTo order, just type the drink name!";
+    coffeeMenu += "\nWe serve North Star Coffee from Leeds!\nPlant-based milk available: Oat, Almond, Soy\n\nTo order, just type the drink name!";
     return coffeeMenu;
   }
 
-  // Hours & Location
   if (lowerText.includes('hours') || lowerText.includes('open') || lowerText.includes('location') || lowerText.includes('address') || lowerText.includes('where')) {
-    return `BREW COFFEE SHOP\n\n12 Brock Street\nLancaster, LA1\n\nOPENING HOURS:\n• Monday-Friday: 8:30am - 4:00pm\n• Saturday: 9:00am - 4:00pm  \n• Sunday: 10:00am - 4:00pm\n\nFood served: 9:00am - 3:00pm daily\n\n5 minutes walk from Lancaster Castle!`;
+    return `BREW COFFEE SHOP\n\n12 Brock Street\nLancaster, LA1\n\nOPENING HOURS:\n- Monday-Friday: 8:30am - 4:00pm\n- Saturday: 9:00am - 4:00pm  \n- Sunday: 10:00am - 4:00pm\n\nFood served: 9:00am - 3:00pm daily\n\n5 minutes walk from Lancaster Castle!`;
   }
 
-  // Greetings
   if (lowerText.includes('hi') || lowerText.includes('hello') || lowerText.includes('hey') || lowerText === 'help') {
-    return "Hello! Great to see you!\n\nWhat can I help you with?\n\nOrder - Place a food/drink order\nMenu - View our full menu\nCoffee - See coffee options\nCart - Check your current order\nHours - Opening times\nLocation - Find us\n\nJust tell me what you need!";
+    return "Hey! Welcome to Brew!\n\nToday's Popular:\n- Latte - £3.70\n- Flat White - £3.60\n- Big Brew Breakfast - £14\n- Avocado Toast - £10\n\nType any item to order\nType 'menu' for full menu\nType 'vegan' for plant-based";
   }
 
-  // Fallback
-  return "I'd love to help!\n\nTry:\n'menu' - See our full menu\n'coffee' - Coffee options\n'cart' - Your current order\n'hours' - Opening times\n'location' - Find us\n\nOr just type an item name like 'latte' or 'breakfast sandwich' to add it to your cart!";
+  return "Quick help!\n\nOrder now:\nJust type: latte, cappuccino, big brew breakfast, etc.\n\nBrowse:\n- 'menu' - Full menu\n- 'vegan' - Plant-based\n- 'gluten free' - GF options\n- 'cart' - Your order\n\nMost popular right now:\nLatte + Avocado Toast - £13.70";
 }
 
-// Admin Dashboard Route with Basic Authentication
+// Admin Dashboard with Authentication
 app.get('/admin', (req, res) => {
-  // Basic authentication
   const auth = req.headers.authorization;
   const credentials = Buffer.from('admin:brewcoffee123').toString('base64');
   
@@ -451,6 +469,7 @@ app.get('/admin', (req, res) => {
     res.setHeader('WWW-Authenticate', 'Basic realm="Admin Dashboard"');
     return res.status(401).send('Authentication required');
   }
+
   res.send(`
 <!DOCTYPE html>
 <html>
@@ -637,10 +656,7 @@ app.get('/admin', (req, res) => {
             .catch(error => console.error('Error completing order:', error));
         }
         
-        // Load orders on page load
         loadOrders();
-        
-        // Auto-refresh every 10 seconds
         setInterval(loadOrders, 10000);
     </script>
 </body>
@@ -648,9 +664,7 @@ app.get('/admin', (req, res) => {
   `);
 });
 
-// API Routes for Admin Dashboard
 app.get('/api/orders', (req, res) => {
-  // Return orders sorted by newest first
   const sortedOrders = activeOrders.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
   res.json(sortedOrders);
 });
@@ -664,7 +678,6 @@ app.post('/api/orders/:id/complete', (req, res) => {
   res.json({ success: true });
 });
 
-// WhatsApp Webhook
 app.post('/webhook', (req, res) => {
   const incomingMessage = req.body.Body;
   const fromNumber = req.body.From;
